@@ -1,0 +1,8 @@
+{
+  "id": "plan-panel",
+  "name": "Plan panel",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.11.4"
+  }
+}

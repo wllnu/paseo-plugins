@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan: Notify users when uploads finish</title>
+<meta name="plan-revision" content="1">
+<meta name="plan-status" content="review">
+</head>
+<body>
+<header>
+<h1>Notify users when uploads finish</h1>
+<p id="summary">Users get a bell notification, and an email if they opted in, when an upload finishes processing. It reuses the existing job queue.</p>
+<ul class="facts">
+<li><b>Size</b> M</li>
+<li><b>Files</b> 7</li>
+<li class="warn"><b>Risk</b> medium</li>
+<li><b>New</b> 1 table, 1 worker</li>
+</ul>
+<aside class="ask" id="question-1"><p><strong>Open:</strong> should notifications expire? Proposed: delete after 90 days.</p></aside>
+</header>
+
+<section id="goal">
+<h2>Done when</h2>
+<ul class="checks">
+<li id="check-1">Bell count updates within 5 s of processing</li>
+<li id="check-2">Opted-in users get exactly one email per upload</li>
+<li id="check-3">A failed upload notifies with a retry link</li>
+</ul>
+<details><summary>How to verify</summary>
+<ol>
+<li>Upload, navigate away, watch the bell: ≤ 5 s.</li>
+<li>Enable the email toggle, upload, check the mail catcher: exactly 1 mail.</li>
+<li><code>pnpm test notifications</code> passes.</li>
+</ol>
+</details>
+</section>
+
+<section id="scope">
+<h2>Scope</h2>
+<div class="compare">
+<div class="ok"><h4>In</h4><ul>
+<li id="scope-in-1">Bell dropdown with unread count</li>
+<li id="scope-in-2">Opt-in email per upload</li>
+</ul></div>
+<div class="no"><h4>Out</h4><ul>
+<li id="scope-out-1">Push and mobile apps</li>
+<li id="scope-out-2">Preferences beyond one toggle</li>
+</ul></div>
+</div>
+</section>
+
+<section id="approach">
+<h2>Approach</h2>
+<ol class="flow">
+<li><b>Upload worker</b> emits upload.processed</li>
+<li class="ok"><b>Notify consumer</b> new</li>
+<li><b>notifications</b> one row per event</li>
+<li><b>Bell + email</b> websocket, mailer</li>
+</ol>
+<table>
+<tr><th>Option</th><th>Trade-off</th></tr>
+<tr id="option-queue" class="chosen"><td>Queue consumer</td><td>Decoupled, free retries; one more worker</td></tr>
+<tr id="option-inline"><td>Inline in upload worker</td><td>Fewer parts; a mail failure fails the upload</td></tr>
+</table>
+<details><summary>Files (7)</summary>
+<ul class="files">
+<li>+ db/migrations/0042_notifications.sql</li>
+<li>+ src/notifications/service.ts</li>
+<li>+ src/workers/notify.ts</li>
+<li>+ src/api/notifications.ts</li>
+<li>~ src/components/TopBar.tsx</li>
+<li>~ src/settings/profile.tsx</li>
+<li>+ src/mail/upload-ready.mjml</li>
+</ul>
+</details>
+</section>
+
+<section id="steps">
+<h2>Steps</h2>
+<ol class="steps">
+<li id="step-1"><strong>Schema</strong> notifications table
+<details><ul>
+<li>Columns: id, user_id, kind, payload jsonb, read_at, created_at</li>
+<li>Index <code>(user_id, read_at)</code></li>
+</ul></details></li>
+<li id="step-2"><strong>Service</strong> create and mark read
+<details><p><code>createNotification(userId, kind, payload)</code>, <code>markRead(id)</code> in <code>src/notifications/service.ts</code>.</p></details></li>
+<li id="step-3"><strong>Consumer</strong> events to notifications
+<details><ul>
+<li>Subscribe to <code>upload.processed</code> and <code>upload.failed</code></li>
+<li>Enqueue a mail job only when <code>user.emailOnUpload</code></li>
+<li>Idempotent on <code>upload_id</code>; queue retries are on</li>
+</ul></details></li>
+<li id="step-4"><strong>API</strong> list and mark read
+<details><p><code>GET /api/notifications</code>, <code>POST /api/notifications/:id/read</code>; auth via the session middleware.</p></details></li>
+<li id="step-5"><strong>Bell</strong> dropdown in the top bar
+<details><p>Subscribe to the existing <code>user:{id}</code> websocket channel; unread count from the list response.</p></details></li>
+<li id="step-6"><strong>Email</strong> template and opt-in toggle</li>
+<li id="step-7"><strong>Tests</strong> service, consumer, bell e2e</li>
+</ol>
+</section>
+
+<section id="risks">
+<h2>Risks</h2>
+<ul>
+<li id="risk-1" class="warn">Each open tab shows the toast → acceptable for v1</li>
+<li id="risk-2" class="warn">Bulk uploads flood the mailer → batch per user per minute</li>
+</ul>
+</section>
+
+<section id="decisions">
+<h2>Decisions</h2>
+<dl>
+<dt id="decision-1">Channels</dt><dd>Bell and email; no push</dd>
+<dt id="decision-2">Email</dt><dd>Opt-in, off by default <span class="tag">assumed</span></dd>
+<dt id="decision-3">Failures</dt><dd>Notify, with a retry link</dd>
+</dl>
+</section>
+</body>
+</html>
