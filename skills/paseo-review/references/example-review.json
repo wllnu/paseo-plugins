@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "title": "Review: retry failed chunk uploads",
+  "createdAt": "2026-10-17T14:05:00Z",
+  "reviewer": "claude (paseo-review)",
+  "verdict": "changes-requested",
+  "summary": "The retry loop never ends for client errors, and the empty-chunk guard is gone. The new `HttpError` in client.ts:7-14 is a good base for the fix.",
+  "scope": {
+    "base": "8a044b07fae80d066e451969dbe0543a8e99fb9e",
+    "baseLabel": "main",
+    "head": "1171bce827c8c64f07ac63595ee1425ea999bdf0",
+    "headLabel": "feature/upload-retry"
+  },
+  "findings": [
+    {
+      "id": "B1",
+      "severity": "blocking",
+      "title": "Client errors (4xx) are retried forever",
+      "symptom": "An upload the server rejects, for example after the session expires, never finishes; the progress bar freezes and later files never upload.",
+      "detail": "The catch block only rethrows when the status is 5xx and the attempts are used up. A 4xx, or a network error that is not an `HttpError`, never matches, so `while (true)` spins forever. `UploadQueue.drain` awaits it at queue.ts:14, so the whole queue stalls.",
+      "fix": "Rethrow at once for errors that cannot succeed on retry (4xx, non-HttpError), and stop after `maxAttempts` for every other error.",
+      "locations": [
+        { "file": "src/upload/retry.ts", "line": 17, "endLine": 20, "note": "rethrow condition" },
+        { "file": "src/upload/queue.ts", "line": 14, "note": "queue awaits it" }
+      ]
+    },
+    {
+      "id": "B2",
+      "severity": "blocking",
+      "title": "Empty-chunk guard was removed",
+      "symptom": "Uploading an empty file sends a request with no body; the server answers 400, which then loops forever (B1).",
+      "detail": "The base version rejected `chunk.size === 0` before sending. The change dropped the check without replacing it.",
+      "fix": "Restore the guard at the top of `uploadChunk`, before the retry loop.",
+      "locations": [
+        { "file": "src/upload/retry.ts", "line": 9, "endLine": 11, "side": "old", "note": "empty-chunk check" }
+      ]
+    },
+    {
+      "id": "S1",
+      "severity": "should-fix",
+      "title": "progressLabel shows NaN% for empty uploads",
+      "symptom": "A zero-byte upload shows \"NaN% uploaded\".",
+      "detail": "`done / total` is `0 / 0` when `total` is 0, and `Math.round(NaN)` stays NaN.",
+      "fix": "Return \"100% uploaded\" when `total` is 0.",
+      "locations": [{ "file": "src/upload/retry.ts", "line": 27 }]
+    },
+    {
+      "id": "S2",
+      "severity": "should-fix",
+      "title": "No tests for the retry behavior",
+      "symptom": "Regressions in retry handling, like B1, ship unnoticed.",
+      "detail": "The change adds backoff and retry branches but no test file. Nothing covers success after a retry, a 4xx, or running out of attempts.",
+      "fix": "Add `src/upload/retry.test.ts` with a fake `sendChunk` and fake timers for those three paths.",
+      "locations": [{ "file": "src/upload/retry.ts", "line": 10, "endLine": 24, "note": "untested" }]
+    },
+    {
+      "id": "N1",
+      "severity": "nit",
+      "title": "Backoff grows linearly",
+      "detail": "`backoffMs * attempt` waits 250, 500, 750 ms. Exponential backoff with jitter spreads retries better when many clients fail at once.",
+      "fix": "`backoffMs * 2 ** (attempt - 1)` plus a small random jitter.",
+      "locations": [{ "file": "src/upload/retry.ts", "line": 21 }]
+    },
+    {
+      "id": "N2",
+      "severity": "nit",
+      "title": "`while (true)` hides the attempt limit",
+      "detail": "A `for (let attempt = 1; attempt <= options.maxAttempts; attempt++)` loop makes the limit visible and drops the manual counter at retry.ts:11.",
+      "locations": [{ "file": "src/upload/retry.ts", "line": 11, "endLine": 12 }]
+    }
+  ]
+}
