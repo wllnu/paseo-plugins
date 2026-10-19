@@ -16,6 +16,7 @@ import {
   type ReviewScope,
 } from "../shared/contracts";
 import { endLineOf, formatLines, isClosed, shortRef, type FindingStatus } from "../shared/findings";
+import { syntaxColors } from "./syntax-colors";
 import { Checkbox, LinkedText, StatusChip, Tint, monoFont, severityColor, type CodeReference, type Platform } from "./ui";
 
 /** What the diff view is pointed at: a finding's location, or a `path:line` reference from finding text. */
@@ -163,6 +164,7 @@ export function DiffView(props: DiffViewProps) {
   const diff = query.data;
 
   const built = useMemo(() => (diff ? buildRows(diff, target, markers, theme) : null), [diff, target, markers, theme]);
+  const syntax = useMemo(() => syntaxColors(theme), [theme]);
 
   // Lines outside the default hunks: widen to the whole file so the finding is still on screen.
   const needsWholeFile = Boolean(
@@ -224,16 +226,8 @@ export function DiffView(props: DiffViewProps) {
       message: { padding: pad, gap: 8 },
       messageText: { color: theme.colors.foregroundMuted, fontSize: 13, lineHeight: 19 },
       error: { color: theme.colors.statusDanger, fontSize: 13, lineHeight: 19 },
-      hunk: {
-        paddingHorizontal: pad,
-        paddingVertical: 4,
-        marginTop: 6,
-        backgroundColor: theme.colors.surface1,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: theme.colors.border,
-      },
-      hunkText: { color: theme.colors.foregroundMuted, fontSize: 11, fontFamily: monoFont(platform) },
+      hunk: { paddingHorizontal: pad, paddingVertical: 3, marginTop: 6 },
+      hunkText: { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18, fontFamily: monoFont(platform) },
     };
   }, [theme, compact, platform]);
 
@@ -281,7 +275,7 @@ export function DiffView(props: DiffViewProps) {
       </View>
     );
   } else {
-    const gutterWidth = built.gutterDigits * 7.5 + 10;
+    const gutterWidth = built.gutterDigits * 7.5 + 14;
     body = (
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {banner ? (
@@ -348,6 +342,7 @@ export function DiffView(props: DiffViewProps) {
               theme={theme}
               platform={platform}
               line={row.line}
+              syntax={syntax}
               highlight={row.target ? focusedSeverity : null}
               isTarget={row.target}
               stripe={row.stripe}
@@ -417,6 +412,8 @@ interface LineRowProps {
   theme: PluginTheme;
   platform: Platform;
   line: DiffLine;
+  /** Color per highlight style; tokens with no style keep the foreground color. */
+  syntax: Record<string, string>;
   isTarget: boolean;
   /** Severity of the focused finding; colors the target highlight. */
   highlight: Finding["severity"] | null;
@@ -426,42 +423,49 @@ interface LineRowProps {
   onLayoutY?: (y: number) => void;
 }
 
-const LineRow = memo(function LineRow({ theme, platform, line, isTarget, highlight, stripe, gutterWidth, onLayoutY }: LineRowProps) {
+// Mirrors Paseo's own diff tab (git/diff-document): one line-number column tinted by line kind, a divider,
+// no +/- column, and add/remove backgrounds at 15% / 10%.
+const LineRow = memo(function LineRow({ theme, platform, line, syntax, isTarget, highlight, stripe, gutterWidth, onLayoutY }: LineRowProps) {
   const mono = monoFont(platform);
   const highlightColor = highlight ? severityColor(theme, highlight) : theme.colors.accent;
-  const gutter = {
-    width: gutterWidth,
-    paddingRight: 6,
-    textAlign: "right" as const,
-    color: theme.colors.foregroundMuted,
-    fontSize: 11,
-    lineHeight: 18,
-    fontFamily: mono,
-    opacity: 0.8,
-  };
+  const numberColor =
+    line.kind === "add" ? theme.colors.statusSuccess : line.kind === "del" ? theme.colors.statusDanger : theme.colors.foregroundMuted;
   return (
     <View
       style={{ flexDirection: "row", position: "relative", minHeight: 18 }}
       onLayout={onLayoutY ? (event) => onLayoutY(event.nativeEvent.layout.y) : undefined}
     >
-      {line.kind === "add" ? <Tint color={theme.colors.statusSuccess} opacity={0.14} /> : null}
-      {line.kind === "del" ? <Tint color={theme.colors.statusDanger} opacity={0.14} /> : null}
+      {line.kind === "add" ? <Tint color={theme.colors.statusSuccess} opacity={0.15} /> : null}
+      {line.kind === "del" ? <Tint color={theme.colors.statusDanger} opacity={0.1} /> : null}
       {isTarget ? <Tint color={highlightColor} opacity={0.2} /> : null}
       <View style={{ width: 3, backgroundColor: isTarget ? highlightColor : (stripe ?? "transparent") }} />
-      <Text style={gutter} selectable={false}>
-        {line.oldLine ?? ""}
-      </Text>
-      <Text style={gutter} selectable={false}>
-        {line.newLine ?? ""}
-      </Text>
       <Text
         selectable={false}
-        style={{ width: 14, color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18, fontFamily: mono }}
+        style={{
+          width: gutterWidth,
+          paddingRight: 7,
+          textAlign: "right",
+          color: numberColor,
+          fontSize: 12,
+          lineHeight: 18,
+          fontFamily: mono,
+          borderRightWidth: 1,
+          borderRightColor: theme.colors.border,
+        }}
       >
-        {line.kind === "add" ? "+" : line.kind === "del" ? "-" : " "}
+        {(line.kind === "del" ? line.oldLine : line.newLine) ?? ""}
       </Text>
-      <Text selectable style={{ flex: 1, paddingRight: 10, color: theme.colors.foreground, fontSize: 12, lineHeight: 18, fontFamily: mono }}>
-        {line.text.replace(/\t/g, "    ") || " "}
+      <Text
+        selectable
+        style={{ flex: 1, paddingLeft: 8, paddingRight: 10, color: theme.colors.foreground, fontSize: 12, lineHeight: 18, fontFamily: mono }}
+      >
+        {line.tokens
+          ? line.tokens.map((token, index) => (
+              <Text key={index} style={token.style && syntax[token.style] ? { color: syntax[token.style] } : undefined}>
+                {token.text.replace(/\t/g, "    ")}
+              </Text>
+            ))
+          : line.text.replace(/\t/g, "    ") || " "}
       </Text>
     </View>
   );

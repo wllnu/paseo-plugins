@@ -148,6 +148,8 @@ export const diffLineSchema = z.object({
   oldLine: z.number().nullable(),
   newLine: z.number().nullable(),
   text: z.string(),
+  /** Syntax-highlighted runs that concatenate to `text`; style names come from @getpaseo/highlight. */
+  tokens: z.array(z.object({ text: z.string(), style: z.string().nullable() })).optional(),
 });
 export type DiffLine = z.infer<typeof diffLineSchema>;
 

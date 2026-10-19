@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
   PLAN_DIR,
+  PLAN_FILE,
   planCommentSchema,
   type PlanComment,
   type listPlansRpc,
@@ -28,12 +29,13 @@ function planPath(directory: string, name: string): string {
 }
 
 function commentsPath(directory: string, name: string): string {
-  return planPath(directory, name).replace(/\.html$/, ".comments.json");
+  return planPath(directory, name).replace(/\.(?:html|md)$/, ".comments.json");
 }
 
-function extractTitle(html: string): string | null {
-  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
-  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1];
+function extractTitle(name: string, text: string): string | null {
+  if (name.endsWith(".md")) return /^#\s+(.+)$/m.exec(text)?.[1]?.trim() || null;
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(text)?.[1];
+  const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(text)?.[1];
   const raw = (title && title.trim()) || (h1 && h1.trim()) || null;
   if (!raw) return null;
   return raw
@@ -58,19 +60,18 @@ export async function listPlans({ directory }: RpcInput<typeof listPlansRpc>): P
   }
   const plans = await Promise.all(
     entries
-      .filter((entry) => /^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/.test(entry))
+      .filter((entry) => PLAN_FILE.test(entry))
       .map(async (name) => {
         const file = path.join(dir, name);
         const stat = await fs.stat(file);
         if (!stat.isFile()) return null;
         let title: string | null = null;
         try {
-          const html = await fs.readFile(file, "utf8");
-          title = extractTitle(html);
+          title = extractTitle(name, await fs.readFile(file, "utf8"));
         } catch {
           title = null;
         }
-        return { name, title: title ?? name.replace(/\.html$/, ""), modifiedAt: stat.mtimeMs };
+        return { name, title: title ?? name.replace(/\.(?:html|md)$/, ""), modifiedAt: stat.mtimeMs };
       }),
   );
   const sorted = plans
@@ -81,8 +82,8 @@ export async function listPlans({ directory }: RpcInput<typeof listPlansRpc>): P
 
 export async function readPlan({ directory, name }: RpcInput<typeof readPlanRpc>): Promise<RpcOutput<typeof readPlanRpc>> {
   const file = planPath(directory, name);
-  const [html, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
-  return { html, modifiedAt: stat.mtimeMs };
+  const [text, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
+  return { text, modifiedAt: stat.mtimeMs };
 }
 
 export async function readComments({

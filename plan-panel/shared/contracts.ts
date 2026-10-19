@@ -1,8 +1,11 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
-/** Plans are read from `<workspace>/.paseo/plans/*.html`. */
+/** Plans are read from `<workspace>/.paseo/plans/*.html`, roadmaps from `*.roadmap.md` beside them. */
 export const PLAN_DIR = ".paseo/plans";
+
+/** File names the panel lists and opens: HTML plans and their markdown roadmaps. */
+export const PLAN_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\.html|\.roadmap\.md)$/;
 
 /** One rendered block of the plan: the unit the comment rail selects or a text selection endpoint resolves to. */
 const planLocatorBaseSchema = z.object({
@@ -54,7 +57,7 @@ export const planCommentSchema = z.object({
 export type PlanComment = z.infer<typeof planCommentSchema>;
 
 export const planSummarySchema = z.object({
-  /** File name inside the plans directory, e.g. `add-notifications.html`. */
+  /** File name inside the plans directory, e.g. `add-notifications.html` or `add-notifications.roadmap.md`. */
   name: z.string(),
   title: z.string(),
   modifiedAt: z.number(),
@@ -62,7 +65,7 @@ export const planSummarySchema = z.object({
 export type PlanSummary = z.infer<typeof planSummarySchema>;
 
 const directory = z.string().min(1);
-const planName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*\.html$/);
+const planName = z.string().regex(PLAN_FILE);
 
 export const listPlansRpc = defineRpc({
   name: "plans.list",
@@ -73,7 +76,8 @@ export const listPlansRpc = defineRpc({
 export const readPlanRpc = defineRpc({
   name: "plans.read",
   input: z.object({ directory, name: planName }),
-  output: z.object({ html: z.string(), modifiedAt: z.number() }),
+  /** Raw file content: HTML for a plan, markdown for a roadmap. */
+  output: z.object({ text: z.string(), modifiedAt: z.number() }),
 });
 
 export const readCommentsRpc = defineRpc({

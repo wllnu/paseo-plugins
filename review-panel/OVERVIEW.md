@@ -4,7 +4,7 @@ Shows the findings of an agent's code review in a workspace panel beside the age
 
 ## How it works
 
-The panel reads review files that an agent writes to `.paseo/reviews/*.json` in the workspace, and refreshes within a couple of seconds when a file changes. A review records the exact commits it covers, so the diff view runs `git diff` on the daemon between those commits, or against the working tree for a review of uncommitted changes. Lines outside the changed hunks are still shown: the panel loads the whole file and says the lines are unchanged context. A file that is not part of the diff is shown as it is in the reviewed commit. Removed code can be referenced by its old line numbers.
+The panel reads review files that an agent writes to `.paseo/reviews/*.json` in the workspace, and refreshes within a couple of seconds when a file changes. A review records the exact commits it covers, so the diff view runs `git diff` on the daemon between those commits, or against the working tree for a review of uncommitted changes. Lines outside the changed hunks are still shown: the panel loads the whole file and says the lines are unchanged context. A file that is not part of the diff is shown as it is in the reviewed commit. Removed code can be referenced by its old line numbers. Code is syntax-highlighted on the daemon with the same highlighter and colors as Paseo's own diff view.
 
 File references written in a finding's text, such as `retry.ts:42` or `src/upload/retry.ts:42-48`, are links into the same diff view. Each finding shows whether it was sent, dismissed, or resolved; the agent marks findings fixed or won't fix in the review file after working on them. Sent and dismissed flags are stored next to the review in `<review>.state.json`.
 

@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { DiffHunk, DiffLine, FileDiff, fileDiffRpc } from "../shared/contracts";
+import { highlightHunks } from "./highlight";
 
 /** Rows beyond this are dropped and the diff is flagged as truncated. */
 const MAX_ROWS = 4000;
@@ -155,6 +156,20 @@ async function showAtRevision(directory: string, revision: string, file: string)
   }
 }
 
+async function readWorkingFile(directory: string, file: string): Promise<string | null> {
+  try {
+    return await fs.readFile(path.join(directory, file), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** A whole-file view with tokens from the content already in hand. */
+function wholeFileHighlighted(content: string, kind: "context" | "add", file: string): Pick<FileDiff, "hunks" | "truncated"> {
+  const whole = wholeFile(content, kind);
+  return { ...whole, hunks: highlightHunks(whole.hunks, file, { old: null, new: content }) };
+}
+
 async function isTracked(directory: string, file: string): Promise<boolean> {
   try {
     await git(directory, ["ls-files", "--error-unmatch", "--", file]);
@@ -196,7 +211,13 @@ export async function computeFileDiff({
     const parsed = parseUnifiedDiff(output);
     if (parsed.binary) return { status: "binary", hunks: [], truncated: false };
     const status = parsed.added ? "added" : parsed.deleted ? "deleted" : "modified";
-    return { status, hunks: parsed.hunks, truncated: parsed.truncated };
+    // Full file contents on both sides, so the highlighter sees each line in its real surroundings.
+    const [oldContent, newContent] = await Promise.all([
+      parsed.added ? null : showAtRevision(directory, base, relative),
+      parsed.deleted ? null : head ? showAtRevision(directory, head, relative) : readWorkingFile(directory, relative),
+    ]);
+    const hunks = highlightHunks(parsed.hunks, relative, { old: oldContent, new: newContent });
+    return { status, hunks, truncated: parsed.truncated };
   }
 
   // The file is not part of the diff: show it whole so the finding's lines are still visible.
@@ -204,18 +225,14 @@ export async function computeFileDiff({
     const content = await showAtRevision(directory, head, relative);
     if (content === null) return { status: "missing", hunks: [], truncated: false };
     if (looksBinary(content)) return { status: "binary", hunks: [], truncated: false };
-    return { status: "unchanged", ...wholeFile(content, "context") };
+    return { status: "unchanged", ...wholeFileHighlighted(content, "context", relative) };
   }
 
-  let content: string;
-  try {
-    content = await fs.readFile(path.join(directory, relative), "utf8");
-  } catch {
-    return { status: "missing", hunks: [], truncated: false };
-  }
+  const content = await readWorkingFile(directory, relative);
+  if (content === null) return { status: "missing", hunks: [], truncated: false };
   if (looksBinary(content)) return { status: "binary", hunks: [], truncated: false };
   // `git diff <base>` leaves out untracked files, so a brand-new file shows up here.
   return (await isTracked(directory, relative))
-    ? { status: "unchanged", ...wholeFile(content, "context") }
-    : { status: "added", ...wholeFile(content, "add") };
+    ? { status: "unchanged", ...wholeFileHighlighted(content, "context", relative) }
+    : { status: "added", ...wholeFileHighlighted(content, "add", relative) };
 }

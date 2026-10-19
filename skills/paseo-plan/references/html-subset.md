@@ -21,7 +21,8 @@ Visual components are plain HTML elements with a `class`. The class list below i
 
 - `title` is shown in the panel header. Prefix it with `Plan:`.
 - `plan-revision` is an integer you bump on every revision. The panel shows it and uses it to label updated elements.
-- `plan-status` is one of `draft`, `review`, `approved`.
+- `plan-status` is one of `draft`, `review`, `approved`. The panel's **Break down** button approves a plan.
+- Roadmaps are markdown, not HTML; see `roadmap.md`.
 - No indentation: whitespace costs characters and the panel ignores it. One block per line; short pairs such as `<dt>…</dt><dd>…</dd>` may share a line.
 
 ## Visual components

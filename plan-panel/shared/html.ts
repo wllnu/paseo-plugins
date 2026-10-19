@@ -352,6 +352,10 @@ export interface PlanDocument {
   title: string;
   revision: string | null;
   status: string | null;
+  /** `roadmap` for a markdown breakdown into work packages (see `roadmap.ts`), otherwise `plan`. */
+  kind: "plan" | "roadmap";
+  /** For a roadmap, the plan file it breaks down. */
+  source: string | null;
   body: HtmlElement;
 }
 
@@ -367,5 +371,12 @@ export function readPlanDocument(root: HtmlElement): PlanDocument {
   const h1 = findElement(root, "h1");
   const title = (titleElement ? textOf(titleElement) : "") || (h1 ? textOf(h1) : "") || "Untitled plan";
   const body = findElement(root, "body") ?? root;
-  return { title, revision: meta("plan-revision"), status: meta("plan-status"), body };
+  return {
+    title,
+    revision: meta("plan-revision"),
+    status: meta("plan-status"),
+    kind: "plan",
+    source: null,
+    body,
+  };
 }

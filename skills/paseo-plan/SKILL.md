@@ -1,6 +1,6 @@
 ---
 name: paseo-plan
-description: Refine a request through a sized interview, then write an HTML plan to .paseo/plans/ that the Paseo plan panel renders, and revise it from the panel's comments. Use when the user asks to plan, spec, scope, design, or refine a feature or change before building it, says "make a plan", "plan this", "let's plan", "/paseo-plan", or when a message starts with "[plan-panel feedback]".
+description: Refine a request through a sized interview, then write an HTML plan to .paseo/plans/ that the Paseo plan panel renders, revise it from the panel's comments, and break an approved plan into a roadmap of work packages for an orchestrated run. Use when the user asks to plan, spec, scope, design, or refine a feature or change before building it, says "make a plan", "plan this", "let's plan", "/paseo-plan", asks to break a plan down into implementation steps or a roadmap, or when a message starts with "[plan-panel feedback]" or "[plan-panel breakdown]".
 user-invocable: true
 argument-hint: "<what to plan>"
 ---
@@ -19,8 +19,9 @@ Turn a rough request into a plan the user can review and annotate in the Paseo *
 4. **Hand the plan to the user** and stop.
 5. **Revise** when `[plan-panel feedback]` arrives. Repeat until the user approves.
 6. **Hand off** to implementation.
+7. **Break down** into a roadmap when `[plan-panel breakdown]` arrives, for an orchestrated run.
 
-If a message starting with `[plan-panel feedback]` arrives, skip to step 5.
+If a message starting with `[plan-panel feedback]` arrives, skip to step 5. If it starts with `[plan-panel breakdown]`, skip to step 7.
 
 ## Step 1: Size the request
 
@@ -145,7 +146,7 @@ Never drop a specific the implementer needs to meet a budget. If the file is sti
 
 - `<title>Plan: …</title>`
 - `<meta name="plan-revision" content="1">`, bump on every revision
-- `<meta name="plan-status" content="review">`; `draft` while writing, `review` when handed over, `approved` after the user approves
+- `<meta name="plan-status" content="review">`; `draft` while writing, `review` when handed over, `approved` after the user approves (pressing **Break down** counts)
 
 **Ids**
 
@@ -186,18 +187,35 @@ Procedure:
 4. Rewrite the file in place: keep ids stable, bump `plan-revision`, add `data-revised="<new revision>"` to every element you changed or added, remove or rewrite anything the feedback invalidated, and update **Decisions** with what the feedback decided.
 5. Reply with a numbered list mirroring the comment numbers: one line per comment saying what changed and where (`#step-3`). Mention anything you chose not to change and why.
 
-When the user approves (in the panel feedback or in chat), set `plan-status` to `approved`, bump the revision, and move to step 6.
+**Approval.** The user approves by pressing **Break down** in the panel, which sends `[plan-panel breakdown]` (step 7), or by saying so in chat or in panel feedback. Set `plan-status` to `approved` (no revision bump needed). After a Break down, continue with step 7; otherwise move to step 6.
 
 ## Step 6: Hand off
 
-Ask how the user wants to proceed if it is not already clear: implement it yourself now, or hand off to another agent. For a handoff, use the `paseo-handoff` skill if available and point the receiving agent at the plan file; the plan is the briefing. Read the whole file before starting, including every `details` block: the detail layer is where the specifics live.
+Ask how the user wants to proceed if it is not already clear: implement it yourself now, hand off to another agent, or break it down into a roadmap for an orchestrated run (the panel's **Break down** button, or step 7 directly). Suggest the roadmap for M and L plans, where one agent would run out of context. For a handoff, use the `paseo-handoff` skill if available and point the receiving agent at the plan file; the plan is the briefing. Read the whole file before starting, including every `details` block: the detail layer is where the specifics live.
 
 While implementing, keep the plan honest so the panel shows progress:
 
 - Mark the step you are on with `class="doing"` and finished steps with `class="done"`; tick met criteria in "Done when" with `class="done"`. These edits do not need a revision bump.
 - When reality forces a change to a step, update the plan file, bump the revision, and mark the change with `data-revised` so the panel stays the source of truth.
 
+## Step 7: Break down into a roadmap
+
+A roadmap is a markdown file that splits the plan into small work packages. The user reviews it in the panel like a plan, then presses **Run**: a new orchestrator agent (the `paseo-orchestrate` skill) takes the packages one at a time, with a scout agent that explores the code and writes a focused brief, then a builder agent that implements the brief. Your job is the cut, not the code-level specifics.
+
+The request arrives as a message starting with `[plan-panel breakdown]` that names the plan file and the roadmap file, or the user asks for it in chat. The Break down button is the user's approval of the plan.
+
+1. Set the plan's `plan-status` to `approved`.
+2. Read `references/roadmap.md` and `references/roadmap-template.md`.
+3. Read the plan file, including every `details` block.
+4. Skim the code along the plan's changeset for seams and the check commands. Stop there; scouts do the deep reading.
+5. Write `.paseo/plans/<plan-slug>.roadmap.md`. If it exists, revise it in place and keep package ids and `Status:` lines.
+6. Reply in a few lines: the number of packages, the order in one line, anything uncovered or risky, and that the user can open it with the **Roadmap** button on the plan, comment on it, and press **Run** when it looks right. Then stop. Do not start implementing and do not start the orchestrator yourself.
+
+Feedback on the roadmap arrives as `[plan-panel feedback]` naming the roadmap file. Revise it with step 5 and the revising rules in `references/roadmap.md`.
+
 ## Reference files
 
 - `references/plan-template.html`: a complete M-sized plan using every component. Copy its structure and its terseness.
 - `references/html-subset.md`: the exact elements and classes the panel renders, the id rules, and the revision markers.
+- `references/roadmap.md`: the markdown roadmap format, how to cut a plan into work packages, and the status values the orchestrator writes.
+- `references/roadmap-template.md`: a complete roadmap for the plan template.
