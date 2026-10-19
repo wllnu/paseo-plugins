@@ -1,0 +1,7 @@
+{
+  "id": "paseo-subagents",
+  "description": "Sidebar screen listing subagents with live status, current activity, tool calls and edits",
+  "requirements": {
+    "paseo": ">=0.11.0"
+  }
+}

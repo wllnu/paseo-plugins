@@ -1,0 +1,7 @@
+{
+  "id": "paseo-rules",
+  "requirements": {
+    "paseo": ">=0.11.0"
+  },
+  "description": "Checks agent changes against your rulesets and lists what was followed and broken"
+}
