@@ -4,7 +4,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Ruleset, parseRuleset } from "../../../server/rules.ts";
+import { type Ruleset, parseRuleset } from "../../../paseo-rules/server/rules.ts";
 
 const dir = process.argv[2];
 if (!dir) {
@@ -78,6 +78,6 @@ if (errors.length) {
   console.error(`${errors.length} ${errors.length === 1 ? "error" : "errors"}. Fix and run again.`);
   process.exit(1);
 }
-const judge = fileURLToPath(new URL("../../../server/examples.check.ts", import.meta.url));
+const judge = fileURLToPath(new URL("../../../paseo-rules/server/examples.check.ts", import.meta.url));
 console.log("Valid. To test every rule against its own examples with the real judge:");
 console.log(`  PASEO_RULES_JUDGE_KEY=... node --experimental-strip-types ${judge} ${dir}`);

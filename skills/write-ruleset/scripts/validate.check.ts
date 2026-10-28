@@ -17,7 +17,7 @@ function expect(output: string, part: string) {
   if (!output.includes(part)) throw new Error(`expected "${part}" in:\n${output}`);
 }
 
-const good = validate(fileURLToPath(new URL("../../../examples", import.meta.url)));
+const good = validate(fileURLToPath(new URL("../../../paseo-rules/examples", import.meta.url)));
 if (good.status !== 0) throw new Error(`the example ruleset should pass:\n${good.output}`);
 expect(good.output, "ui.md: 3 rules");
 expect(good.output, "examples.check.ts");
