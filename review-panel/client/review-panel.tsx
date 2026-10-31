@@ -225,11 +225,11 @@ export function ReviewPanel({ theme, layout, workspaceId, agentId }: PluginAgent
   const canSend = hasAgent && selected.size > 0 && agentStatus !== "closed" && !sending;
 
   const sendFindings = useCallback(
-    async (note: string) => {
+    async (note: string, comments: Record<string, string>) => {
       if (!review || !reviewName || selectedFindings.length === 0) return;
       setSending(true);
       try {
-        await paseo.agents.ref(agentId).send(buildFixPrompt({ reviewName, review, findings: selectedFindings, note }));
+        await paseo.agents.ref(agentId).send(buildFixPrompt({ reviewName, review, findings: selectedFindings, note, comments }));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not send the findings to the agent.");
         setSending(false);

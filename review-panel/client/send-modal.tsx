@@ -17,7 +17,8 @@ export interface SendModalProps {
   /** The agent is mid-turn: sending interrupts it. */
   agentBusy: boolean;
   busy: boolean;
-  onSend(note: string): Promise<void>;
+  /** `comments` holds the per-finding comments, keyed by finding id. */
+  onSend(note: string, comments: Record<string, string>): Promise<void>;
 }
 
 export function SendModal({
@@ -33,13 +34,18 @@ export function SendModal({
   onSend,
 }: SendModalProps) {
   const [note, setNote] = useState("");
+  const [comments, setComments] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (open) setNote("");
+    if (open) {
+      setNote("");
+      setComments({});
+    }
   }, [open]);
 
   const styles = useMemo(
     () => ({
-      list: { gap: 6 },
+      list: { gap: 10 },
+      entry: { gap: 4 },
       item: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 },
       dot: { width: 7, height: 7, borderRadius: 4 },
       id: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "700" as const, fontFamily: monoFont(platform), minWidth: 26 },
@@ -54,6 +60,19 @@ export function SendModal({
         backgroundColor: theme.colors.surface2,
       },
       noticeText: { flex: 1, color: theme.colors.foreground, fontSize: 12, lineHeight: 17 },
+      comment: {
+        marginLeft: 15,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface1,
+        color: theme.colors.foreground,
+        fontSize: 13,
+        lineHeight: 18,
+        textAlignVertical: "top" as const,
+      },
       input: {
         minHeight: 80,
         padding: 12,
@@ -96,7 +115,7 @@ export function SendModal({
 
   async function send() {
     if (!canSend) return;
-    await onSend(note);
+    await onSend(note, comments);
   }
 
   return (
@@ -109,12 +128,23 @@ export function SendModal({
       <Modal.Content>
         <View style={styles.list}>
           {findings.map((finding) => (
-            <View key={finding.id} style={styles.item}>
-              <View style={[styles.dot, { backgroundColor: severityColor(theme, finding.severity) }]} />
-              <Text style={styles.id}>{finding.id}</Text>
-              <Text style={styles.title} numberOfLines={1}>
-                {finding.title}
-              </Text>
+            <View key={finding.id} style={styles.entry}>
+              <View style={styles.item}>
+                <View style={[styles.dot, { backgroundColor: severityColor(theme, finding.severity) }]} />
+                <Text style={styles.id}>{finding.id}</Text>
+                <Text style={styles.title} numberOfLines={1}>
+                  {finding.title}
+                </Text>
+              </View>
+              <TextInput
+                value={comments[finding.id] ?? ""}
+                onChangeText={(text) => setComments((current) => ({ ...current, [finding.id]: text }))}
+                multiline
+                placeholder="Optional comment, e.g. how to fix it instead"
+                placeholderTextColor={theme.colors.foregroundMuted}
+                style={styles.comment}
+                accessibilityLabel={`Comment on ${finding.id}`}
+              />
             </View>
           ))}
         </View>

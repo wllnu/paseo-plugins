@@ -10,6 +10,8 @@ export interface FixPromptInput {
   findings: readonly Finding[];
   /** Optional instructions the user typed in the send dialog. */
   note: string;
+  /** Optional per-finding comments from the send dialog, keyed by finding id. */
+  comments?: Readonly<Record<string, string>>;
 }
 
 function pushBlock(lines: string[], label: string, text: string | null | undefined) {
@@ -22,7 +24,7 @@ function pushBlock(lines: string[], label: string, text: string | null | undefin
 }
 
 /** The message sent to the agent: everything it needs to locate, fix, and report back on each finding. */
-export function buildFixPrompt({ reviewName, review, findings, note }: FixPromptInput): string {
+export function buildFixPrompt({ reviewName, review, findings, note, comments = {} }: FixPromptInput): string {
   const lines: string[] = [];
   const count = findings.length === 1 ? "1 finding" : `${findings.length} findings`;
   lines.push(`${FIX_PROMPT_TAG} Fix ${count} from the review "${review.title}".`);
@@ -43,6 +45,7 @@ export function buildFixPrompt({ reviewName, review, findings, note }: FixPrompt
     pushBlock(lines, "Symptom", finding.symptom);
     pushBlock(lines, "Detail", finding.detail);
     pushBlock(lines, "Fix", finding.fix);
+    pushBlock(lines, "My comment", comments[finding.id]);
     lines.push("");
   });
   const trimmedNote = note.trim();
@@ -52,7 +55,7 @@ export function buildFixPrompt({ reviewName, review, findings, note }: FixPrompt
     lines.push("");
   }
   lines.push(
-    "Verify each finding against the current code before changing it. If you disagree with one, do not change the code for it; mark it wont-fix and say why. Fix the rest, run the relevant tests, then set \"resolution\" on each finding in the review file ({\"status\": \"fixed\" | \"wont-fix\", \"note\": \"...\"}) and reply with one line per id.",
+    "Verify each finding against the current code before changing it. Where I left a comment on a finding, follow it over the suggested fix. If you disagree with one, do not change the code for it; mark it wont-fix and say why. Fix the rest, run the relevant tests, then set \"resolution\" on each finding in the review file ({\"status\": \"fixed\" | \"wont-fix\", \"note\": \"...\"}) and reply with one line per id.",
   );
   return lines.join("\n");
 }

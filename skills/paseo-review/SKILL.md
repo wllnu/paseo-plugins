@@ -104,11 +104,11 @@ Then stop. Do not paste every finding into the chat; the panel is the review sur
 
 ## Step 7: Fix from the panel
 
-The user's selection arrives as a message starting with `[review-panel fix]`. It names the review file and the reviewed diff, then lists each finding with its id, severity, title, `Where`, `Symptom`, `Detail`, and `Fix`, and may end with a `Note from me` that overrides the suggestions.
+The user's selection arrives as a message starting with `[review-panel fix]`. It names the review file and the reviewed diff, then lists each finding with its id, severity, title, `Where`, `Symptom`, `Detail`, `Fix`, and possibly `My comment`, and may end with a `Note from me` that overrides the suggestions.
 
 1. Read the review file and the current code at every location; code may have moved since the review.
 2. Check each finding is real. If it is not, do not change code for it: mark it `wont-fix` with the reason.
-3. Fix the rest, blocking first, following the user's note. Ask before a fix that needs a product decision; fix the others in the same turn.
+3. Fix the rest, blocking first, following the user's note. A finding's `My comment` overrides its `Fix`. Ask before a fix that needs a product decision; fix the others in the same turn.
 4. Run the relevant tests, typecheck, and lint.
 5. Set `resolution` on each listed finding in the review file: `{"status": "fixed", "note": "what changed, file:line", "at": "<ISO time>"}` or `{"status": "wont-fix", "note": "why"}`. Change nothing else in the file: no new ids, no removed findings. The panel shows the resolution next to the finding.
 6. Reply with one line per id (`B1 fixed: stop retrying on 4xx, retry.ts:44`) and the checks you ran.

@@ -6,7 +6,7 @@ Each folder at the top level is one plugin. The `skills/` folder holds the agent
 
 | Plugin | What it does | Needs |
 | --- | --- | --- |
-| [`plan-panel`](plan-panel/OVERVIEW.md) | Shows an agent's HTML plan beside it. You comment on any block and send the comments back. Then you break the plan into a roadmap and run it package by package. | Paseo 0.11.4+, `paseo-plan` and `paseo-orchestrate` skills |
+| [`plan-panel`](plan-panel/OVERVIEW.md) | Shows an agent's HTML plan beside it. You comment on any block and send the comments back. When the plan looks right, press Implement and follow the agent's progress in the plan. | Paseo 0.11.4+, `paseo-plan` and `paseo-implement` skills |
 | [`review-panel`](review-panel/OVERVIEW.md) | Shows an agent's code review grouped into blocking, should fix, and nitpicks. Each finding opens a diff at the lines it is about. Tick findings and send them back to be fixed. | Paseo 0.11.4+, `paseo-review` skill, a git repository |
 | `paseo-rules` | Checks each file an agent changed against rulesets you write in markdown, and lists which rules were followed and which were broken. | Paseo 0.11+, an API key for the judge model |
 | `paseo-subagents` | An Explorer panel that lists an agent's subagents with live status, current activity, tool calls, and edits. You can stop one from the list. | Paseo 0.11+ |
@@ -33,47 +33,46 @@ Drop any plugin you don't want from the list. Paseo loads each one from the fold
 paseo plugin ls
 ```
 
-To update, run `git pull`, then `npm install` in each plugin folder, then `paseo plugin reload <id>`. `paseo plugin remove <id>` uninstalls a plugin and leaves the folder alone. `paseo plugin logs <id>` shows the plugin's server output when something fails.
+To update, run `git pull`, then `npm install` in each plugin folder, then `paseo plugin reload <id>`. `paseo plugin remove <id>` uninstalls a plugin and leaves the folder alone, but it deletes the plugin's settings in `~/.paseo/plugin-settings/<id>/`, so back those up before you re-add a plugin from a new folder. `paseo plugin logs <id>` shows the plugin's server output when something fails.
 
 ### Skills
 
-The plan and review panels only display files. An agent writes those files, and the skills teach it the format. Copy the skills into your agent's skills folder. For Claude Code:
+The plan and review panels only display files. An agent writes those files, and the skills teach it the format. Symlink the skills into your agent's skills folder, so `git pull` updates them too. For Claude Code:
 
 ```bash
-cp -r skills/paseo-plan skills/paseo-orchestrate skills/paseo-review ~/.claude/skills/
-cp -r paseo-rules/skills/write-ruleset ~/.claude/skills/
+for skill in paseo-plan paseo-implement paseo-review write-ruleset; do
+  ln -sfn "$PWD/skills/$skill" ~/.claude/skills/$skill
+done
 ```
 
-Other providers use their own folder, such as `~/.agents/skills/`.
+Other providers use their own folder, such as `~/.agents/skills/`. Don't copy `write-ruleset`: its scripts import from `paseo-rules/` in this repository and break outside it.
 
 | Skill | Used by | What it does |
 | --- | --- | --- |
-| `paseo-plan` | `plan-panel` | Interviews you about a request, writes the plan to `.paseo/plans/`, revises it from your comments, and breaks it into a roadmap |
-| `paseo-orchestrate` | `plan-panel` | Runs a roadmap. For each package it starts a scout and a builder, verifies the result, and waits for your review |
+| `paseo-plan` | `plan-panel` | Interviews you about a request, writes a plan (task, guardrails, definition of done) to `.paseo/plans/`, and revises it from your comments until you approve it |
+| `paseo-implement` | `plan-panel` | Implements an approved plan until every "Done when" criterion passes its check. It ticks criteria and keeps a progress log in the plan, and uses subagents where the work splits |
 | `paseo-review` | `review-panel` | Reviews a change, writes the findings to `.paseo/reviews/`, and fixes the ones you send back |
 | `write-ruleset` | `paseo-rules` | Turns a style guide or a loose list of rules into a ruleset the rules check can judge |
 
 ## Using them
 
-### Plan, review, run
+### Plan, implement, review
 
 ```mermaid
 flowchart LR
   ask["/paseo-plan"] --> plan["Plan in the Plan panel"]
   plan -- "comment and Send" --> plan
-  plan -- "Break down" --> roadmap["Roadmap of work packages"]
-  roadmap -- "comment and Send" --> roadmap
-  roadmap -- "Run" --> build["Orchestrator: scout, then builder"]
-  build --> check["You review the package"]
-  check -- "Continue" --> build
+  plan -- "Implement" --> build["Agent works through Done when"]
+  build -- "Ask first" --> plan
+  build --> check["You review the changes"]
   check -. "/paseo-review" .-> review["Findings in the Review panel"]
   review -- "send findings to fix" --> check
 ```
 
 1. Ask an agent to plan something, or type `/paseo-plan <what to plan>`.
 2. Open the plan with `/plan-panel`, from the Command Center (**⌘K**, Open plan panel), or from the workspace tab bar. Click the handles in the rail on the right to comment on blocks, or select text and comment on that. Press **Send** when you are done. The agent revises the plan and the panel updates.
-3. When the plan looks right, press **Break down**. The agent writes a roadmap of small work packages, and you can comment on it the same way.
-4. Press **Run** to start an orchestrator. It builds one package at a time and stops after each one. Look at the changes, then press **Continue**. Nothing gets committed, so every change stays in your working tree.
+3. When the plan looks right, press **Implement**. That approves the plan, and the agent works until every "Done when" criterion passes its check. It stops and asks before anything listed under "Ask first".
+4. Follow along in the panel. The criterion being worked on is highlighted, finished ones are ticked, and a progress log at the end records the evidence. Nothing gets committed, so every change stays in your working tree.
 
 The **Plans** entry in the sidebar lists plans from all your workspaces.
 
