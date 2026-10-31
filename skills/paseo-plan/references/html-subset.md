@@ -21,20 +21,19 @@ Visual components are plain HTML elements with a `class`. The class list below i
 
 - `title` is shown in the panel header. Prefix it with `Plan:`.
 - `plan-revision` is an integer you bump on every revision. The panel shows it and uses it to label updated elements.
-- `plan-status` is one of `draft`, `review`, `approved`. The panel's **Break down** button approves a plan.
-- Roadmaps are markdown, not HTML; see `roadmap.md`.
+- `plan-status` is one of `draft`, `review`, `approved`, `done`. The panel's **Implement** button approves a plan; the implementing agent sets `done` when every criterion is verified.
 - No indentation: whitespace costs characters and the panel ignores it. One block per line; short pairs such as `<dt>…</dt><dd>…</dd>` may share a line.
 
 ## Visual components
 
 | Markup | Renders as | Use for |
 | --- | --- | --- |
-| `<ul class="facts"><li><b>Size</b> M</li>…</ul>` | A row of chips, label muted, value bold | Key numbers under the summary: size, files, risk, new parts |
+| `<ul class="facts"><li><b>Size</b> M</li>…</ul>` | A row of chips, label muted, value bold | Key numbers under the summary: size, area, new parts, risk |
 | `<ol class="flow"><li><b>Worker</b> emits event</li>…</ol>` | Boxes joined by arrows: one row when wide, stacked when narrow | Data flow, request path, user journey; 3–6 boxes |
-| `<ol class="steps"><li><strong>Title</strong> caption …</li></ol>` | Numbered timeline, title over a muted caption | Implementation steps |
-| `<ul class="checks"><li>…</li></ul>` | Checkboxes | Acceptance criteria ("Done when") |
+| `<ol class="steps"><li><strong>Title</strong> caption …</li></ol>` | Numbered timeline, title over a muted caption | A sequence where order matters, e.g. a migration's phases. Not for implementation steps; plans have none |
+| `<ul class="checks"><li>…</li></ul>` | Checkboxes | Acceptance criteria ("Done when"); `done` ticks them during implementation |
 | `<ul class="files"><li>+ src/a.ts</li><li>~ src/b.ts</li><li>- src/c.ts</li></ul>` | Monospace changeset, `+` green, `~` amber, `-` red | Files added, changed, removed |
-| `<div class="compare"><div>…</div><div>…</div></div>` | Side-by-side columns, stacked when narrow | In/out of scope, before/after, two or three options |
+| `<div class="compare"><div>…</div><div>…</div></div>` | Side-by-side columns, stacked when narrow | Guardrails (Always / Ask first / Never), before/after, two or three options |
 | `<dl><dt>Label</dt><dd>Value</dd></dl>` | Two-column rows, label muted on the left | Decisions, settings, mappings |
 | `<aside class="ask"><p>…</p></aside>` | Tinted callout with an icon | A blocking question, a warning, a key note |
 | `<details><summary>Label</summary>…</details>` | Collapsed by default behind a `›` toggle; `Details` when there is no `summary` | The detail layer: specifics only the implementer needs |
@@ -55,7 +54,7 @@ Put these on the element itself, combined with the components above:
 | `ask` | same | Accent ? (open question for the user) |
 | `note` | same | Muted i (side note); also the default for `aside` |
 | `chosen` | `li`, `tr`, column, `dt`/`dd` | Highlighted as the selected option |
-| `done`, `doing` | `li` in `steps` or `checks` | Progress: ✓ filled or highlighted. Use during implementation |
+| `done`, `doing` | `li` in `steps` or `checks` | Progress: ✓ filled or highlighted. Set by the implementing agent |
 
 On a list item a tone replaces the bullet with its icon. On a `compare` column it colors the column's top edge. On a `steps` item it colors the number.
 
@@ -83,8 +82,8 @@ Escape `<`, `>`, and `&` in text as `&lt;`, `&gt;`, `&amp;`. Named entities such
 
 ## Ids
 
-- Every `section`, step, check, scope item, decision, risk, question, and option row gets a short, stable, kebab-case id: `goal`, `step-3`, `check-2`, `scope-in-1`, `decision-2`, `risk-1`, `question-1`, `option-queue`. In a `dl`, put the id on the `dt`. Chips, flow boxes, and items inside `details` need no id.
-- Never renumber or rename ids in a revision. Append new ids (`step-3b`, `step-8`). When elements merge, keep the survivor's id and delete the other. Delete elements that are gone.
+- Every `section`, task item, decision, guardrail, criterion, and question gets a short, stable, kebab-case id: `task`, `task-2`, `decision-1`, `guard-3`, `done-2`, `question-1`, `log`. In a `dl`, put the id on the `dt`. Chips, flow boxes, log entries, and items inside `details` need no id.
+- Never renumber or rename ids in a revision. Append new ids (`task-2b`, `done-5`). When elements merge, keep the survivor's id and delete the other. Delete elements that are gone.
 - Comments are matched to elements by id, so stable ids keep the user's comment badges attached to the right place. Elements without an id are matched by position, which shifts when you insert content above them.
 
 ## Revisions

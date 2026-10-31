@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { PLAN_DIR, listPlansRpc, type PlanSummary } from "../shared/contracts";
-import { isRoadmapName } from "../shared/roadmap";
 import { PlanViewer, type AgentSummary } from "./plan-panel";
 
 export const PLANS_SCREEN_ID = "plans";
@@ -43,16 +42,7 @@ function useAgentSummary(agentId: string): AgentSummary | null {
       const handle = paseo.agents.ref(agentId);
       await handle.refresh();
       const snapshot = handle.current();
-      return snapshot
-        ? {
-            status: snapshot.status,
-            title: snapshot.title,
-            provider: snapshot.provider,
-            model: snapshot.model,
-            modeId: snapshot.currentModeId,
-            thinkingOptionId: snapshot.thinkingOptionId ?? null,
-          }
-        : null;
+      return snapshot ? { status: snapshot.status, title: snapshot.title } : null;
     },
   });
   return query.data ?? null;
@@ -63,15 +53,13 @@ interface PlanScreenViewProps extends PluginScreenProps {
   onOpenBesideAgent(): void;
 }
 
-function PlanScreenView({ theme, layout, navigation, params, onBack, onOpenBesideAgent }: PlanScreenViewProps) {
+function PlanScreenView({ theme, layout, params, onBack, onOpenBesideAgent }: PlanScreenViewProps) {
   const agentId = params.agentId ?? "";
   const agent = useAgentSummary(agentId);
   return (
     <PlanViewer
       theme={theme}
       layout={layout}
-      navigation={navigation}
-      workspaceId={params.workspaceId ?? null}
       directory={params.directory ?? null}
       agentId={agentId}
       agent={agent}
@@ -251,7 +239,7 @@ function PlansList({ theme, layout, onOpen, onOpenBesideAgent }: PlansListProps)
                 })
               }
             >
-              <Icon name={isRoadmapName(plan.name) ? "ListTree" : "ClipboardList"} size={18} color={theme.colors.foregroundMuted} />
+              <Icon name="ClipboardList" size={18} color={theme.colors.foregroundMuted} />
               <View style={styles.rowBody}>
                 <Text style={styles.planTitle} numberOfLines={1}>
                   {plan.title}

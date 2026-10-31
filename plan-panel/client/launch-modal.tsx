@@ -13,13 +13,6 @@ export interface LaunchNote {
   text: string;
 }
 
-export interface LaunchChoice {
-  id: string;
-  label: string;
-  /** Provider and model, shown under the label. */
-  detail: string;
-}
-
 export interface LaunchModalProps {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -30,11 +23,6 @@ export interface LaunchModalProps {
   intro: string;
   facts: readonly LaunchFact[];
   notes: readonly LaunchNote[];
-  /** Agent configurations to pick from, e.g. profiles for the orchestrator. Omit to hide the picker. */
-  choices?: readonly LaunchChoice[];
-  choicesLabel?: string;
-  choiceId?: string | null;
-  onChoiceChange?(id: string): void;
   confirmLabel: string;
   busy: boolean;
   disabled?: boolean;
@@ -51,10 +39,6 @@ export function LaunchModal({
   intro,
   facts,
   notes,
-  choices,
-  choicesLabel,
-  choiceId,
-  onChoiceChange,
   confirmLabel,
   busy,
   disabled,
@@ -67,20 +51,6 @@ export function LaunchModal({
       factRow: { flexDirection: "row" as const, gap: 10 },
       factLabel: { width: 84, color: theme.colors.foregroundMuted, fontSize: 13 },
       factValue: { flex: 1, color: theme.colors.foreground, fontSize: 13, fontWeight: "600" as const },
-      label: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "600" as const, textTransform: "uppercase" as const },
-      choices: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 8 },
-      choice: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surface1,
-        gap: 2,
-      },
-      choiceActive: { borderColor: theme.colors.accent, backgroundColor: theme.colors.surface2 },
-      choiceLabel: { color: theme.colors.foreground, fontSize: 13, fontWeight: "600" as const },
-      choiceDetail: { color: theme.colors.foregroundMuted, fontSize: 11 },
       note: { flexDirection: "row" as const, gap: 8, alignItems: "flex-start" as const },
       noteText: { flex: 1, color: theme.colors.foregroundMuted, fontSize: 13, lineHeight: 18 },
       actions: { flexDirection: "row" as const, justifyContent: "flex-end" as const, gap: 8 },
@@ -128,30 +98,7 @@ export function LaunchModal({
               </View>
             ))}
           </View>
-        ) : null}
-        {choices ? (
-          <View style={{ gap: 8 }}>
-            {choicesLabel ? <Text style={styles.label}>{choicesLabel}</Text> : null}
-            <View style={styles.choices}>
-              {choices.map((choice) => {
-                const active = choice.id === choiceId;
-                return (
-                  <Pressable
-                    key={choice.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    style={[styles.choice, active ? styles.choiceActive : null]}
-                    onPress={() => onChoiceChange?.(choice.id)}
-                  >
-                    <Text style={styles.choiceLabel}>{choice.label}</Text>
-                    <Text style={styles.choiceDetail}>{choice.detail}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-        {notes.map((note) => (
+        ) : null}        {notes.map((note) => (
           <View key={note.text} style={styles.note}>
             <Icon
               name={note.tone === "warn" ? "TriangleAlert" : "Info"}

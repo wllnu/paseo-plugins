@@ -63,17 +63,15 @@ export interface FeedbackPromptInput {
   planName: string;
   planTitle: string;
   revision: string | null;
-  /** A roadmap is markdown and must keep the Status lines of its work packages. */
-  kind?: "plan" | "roadmap";
   comments: readonly PlanComment[];
 }
 
 /** The message sent to the agent. Everything the agent needs to find and address each comment. */
-export function buildFeedbackPrompt({ planName, planTitle, revision, kind = "plan", comments }: FeedbackPromptInput): string {
+export function buildFeedbackPrompt({ planName, planTitle, revision, comments }: FeedbackPromptInput): string {
   const lines: string[] = [];
   const revisionLabel = revision ? ` (revision ${revision})` : "";
-  lines.push(`[plan-panel feedback] Feedback on the ${kind} "${planTitle}"${revisionLabel}.`);
-  lines.push(`${kind === "roadmap" ? "Roadmap" : "Plan"} file: ${PLAN_DIR}/${planName}`);
+  lines.push(`[plan-panel feedback] Feedback on the plan "${planTitle}"${revisionLabel}.`);
+  lines.push(`Plan file: ${PLAN_DIR}/${planName}`);
   lines.push("");
   lines.push(
     comments.length === 1
@@ -101,9 +99,7 @@ export function buildFeedbackPrompt({ planName, planTitle, revision, kind = "pla
     lines.push("");
   });
   lines.push(
-    kind === "roadmap"
-      ? "Please refine the roadmap: address every comment, update the markdown file in place, keep package ids stable, and keep the Status lines of packages you do not change. Then reply with a short summary of what changed per comment. If a comment is ambiguous, ask me before changing the roadmap."
-      : "Please refine the plan: address every comment, update the HTML plan file in place, keep existing element ids stable, bump the plan-revision meta, and mark changed elements with data-revised=\"<new revision>\". Then reply with a short summary of what changed per comment. If a comment is ambiguous, ask me before changing the plan.",
+    "Please refine the plan: address every comment, update the HTML plan file in place, keep existing element ids stable, bump the plan-revision meta, and mark changed elements with data-revised=\"<new revision>\". Then reply with a short summary of what changed per comment. If a comment is ambiguous, ask me before changing the plan.",
   );
   return lines.join("\n");
 }

@@ -1,13 +1,15 @@
 ---
 name: paseo-plan
-description: Refine a request through a sized interview, then write an HTML plan to .paseo/plans/ that the Paseo plan panel renders, revise it from the panel's comments, and break an approved plan into a roadmap of work packages for an orchestrated run. Use when the user asks to plan, spec, scope, design, or refine a feature or change before building it, says "make a plan", "plan this", "let's plan", "/paseo-plan", asks to break a plan down into implementation steps or a roadmap, or when a message starts with "[plan-panel feedback]" or "[plan-panel breakdown]".
+description: Refine a request through a sized interview, then write a short HTML plan (task, guardrails, definition of done) to .paseo/plans/ that the Paseo plan panel renders, and revise it from the panel's comments until the user approves it. Use when the user asks to plan, spec, scope, design, or refine a feature or change before building it, says "make a plan", "plan this", "let's plan", "/paseo-plan", or when a message starts with "[plan-panel feedback]".
 user-invocable: true
 argument-hint: "<what to plan>"
 ---
 
 # Paseo plan
 
-Turn a rough request into a plan the user can review and annotate in the Paseo **Plan** panel. The flow is a refinement session: interview first, then write the plan as HTML, then revise it from the comments the user sends back from the panel. Do not implement anything until the user approves the plan.
+Turn a rough request into a plan the user can review and annotate in the Paseo **Plan** panel. Interview first, then write the plan as HTML, then revise it from the comments the user sends back from the panel. Do not implement anything until the user approves the plan.
+
+A plan is a contract, not a recipe. It says **what** to build and why (Task), **what must not happen** (Guardrails), and **how anyone can tell it is finished** (Done when). It never lists implementation steps: the implementing agent reads the code and decides the order itself, and step lists go stale the moment the code disagrees with them.
 
 **User's request:** $ARGUMENTS
 
@@ -18,21 +20,20 @@ Turn a rough request into a plan the user can review and annotate in the Paseo *
 3. **Write the plan** to `.paseo/plans/<slug>.html` using the template and HTML subset in `references/`.
 4. **Hand the plan to the user** and stop.
 5. **Revise** when `[plan-panel feedback]` arrives. Repeat until the user approves.
-6. **Hand off** to implementation.
-7. **Break down** into a roadmap when `[plan-panel breakdown]` arrives, for an orchestrated run.
+6. **Implement** once approved, with the `paseo-implement` skill.
 
-If a message starting with `[plan-panel feedback]` arrives, skip to step 5. If it starts with `[plan-panel breakdown]`, skip to step 7.
+If a message starting with `[plan-panel feedback]` arrives, skip to step 5. If it starts with `[plan-panel implement]`, go to step 6.
 
 ## Step 1: Size the request
 
-Look at the codebase before asking anything. Find the files the request touches, the existing patterns, tests, and anything that already does part of the job. Questions the code can answer are never asked.
+Look at the codebase before asking anything. Find the files the request touches, the existing patterns, the test and check commands, and anything that already does part of the job. Questions the code can answer are never asked.
 
 Then size the request:
 
 | Size | Typical shape | Interview budget |
 | --- | --- | --- |
-| XS | One file, obvious change, no product decision | 0–1 questions, or none; confirm your reading in one sentence and go to the plan |
-| S | A few files, one clear feature, few branches | 1 round, 2–4 questions |
+| XS | One file, obvious change, no product decision | None; confirm your reading in one sentence and go to the plan |
+| S | A few files, one clear feature | 1 round, 2–4 questions |
 | M | New component, API, or workflow; several ways to do it | 2 rounds, 4–8 questions total |
 | L | Cross-cutting change, migration, new subsystem, or unclear goal | 2–4 rounds, 8–15 questions total, with a written summary between rounds |
 
@@ -42,16 +43,13 @@ Tell the user the size in one line before the first round, for example: "This is
 
 ## Step 2: Interview
 
-Interview like a product refinement session: the goal is a shared understanding of *what* and *why*, and the decisions that shape *how*.
+The interview fills the plan's three sections. Cover, in this order, skipping anything already clear:
 
-Cover, in this order of priority, skipping anything already clear:
-
-1. **Outcome.** What should be true when this is done? Who benefits?
-2. **Boundaries.** What is explicitly out of scope? What must not change?
-3. **Decisions with alternatives.** Where there are two or more sensible designs, present them with a recommendation and a one-line trade-off each.
-4. **Constraints.** Compatibility, performance, security, deadlines, dependencies, rollout.
-5. **Acceptance.** How will the user verify the result? What would make them reject it?
-6. **Unknowns you found in the code.** Dead code, conflicting patterns, missing tests that change the plan.
+1. **Outcome** (Task). What should be true when this is done, and for whom? Why now?
+2. **Decisions** (Task). Where two or more sensible designs exist, present them with a recommendation and a one-line trade-off each. What is explicitly out of scope?
+3. **Boundaries** (Guardrails). What must not change? What should the implementer ask about before doing it: new dependencies, schema or public API changes, touching a shared module?
+4. **Acceptance** (Done when). How will the user check the result? What would make them reject it? Which command, test, or manual check proves each part?
+5. **Unknowns you found in the code.** Dead code, conflicting patterns, missing tests that change the plan.
 
 Rules:
 
@@ -60,8 +58,8 @@ Rules:
 - Prefer **closed questions** with options. Use the `AskUserQuestion` tool when it is available; otherwise write a numbered list and wait.
 - Never ask what you can read from the code, the git history, or the conversation.
 - After each round, **restate the decisions** in one short list before asking the next round or writing the plan.
-- Stop when the remaining uncertainty would not change the plan's steps. Do not interview for completeness.
-- If the user says "just plan it" or answers with defaults, stop asking and write the plan under stated assumptions. Put the assumptions in the plan's **Decisions** section marked as assumptions.
+- Stop when the remaining uncertainty would not change the plan. Do not interview for completeness.
+- If the user says "just plan it" or answers with defaults, stop asking and write the plan under stated assumptions, tagged `assumed`.
 
 ## Step 3: Write the plan
 
@@ -73,96 +71,72 @@ Read `references/plan-template.html` and `references/html-subset.md` before writ
 - `<slug>` is kebab-case from the title, for example `notify-on-upload-finish.html`. One plan per request. Keep the same file across revisions.
 - Keep the file out of commits unless the user asks for it. If the repository does not ignore `.paseo/`, append `.paseo/` to `.git/info/exclude` (local only, not `.gitignore`).
 
-**Two layers**
+**Two readers**
 
-A plan has two readers. The user reviews it in a narrow side panel and should grasp it in about a minute. You, or another agent, implement from it later and need every specific. Write both into the same file:
-
-- **Glance layer** (visible): summary, facts, flow, step titles, scope columns, risks, decisions. Show structure with components, not prose. Visible items are short fragments, never paragraphs (word limits under **Writing rules**).
-- **Detail layer** (inside `<details>`, collapsed by default): file paths, function names, signatures, commands, thresholds, edge cases, test names. It costs the reader nothing until they open it, but it is part of the plan: the user can expand it and comment on it, and it is binding during implementation.
-
-Sort each fact with one test: would the user want to see or change it while reviewing? Then it is visible. If only the implementer needs it (paths, versions, URL lists, commands, thresholds), it goes into `<details>`. A `details` can sit inside any item that has specifics, such as a step, a `dd`, or a risk, and below a section's visuals.
+The user reviews the plan in a narrow side panel and should grasp it in about a minute. An agent implements from it later, possibly in a fresh context, and needs what it cannot see in the code. Visible items are short fragments for the user; specifics only the implementer needs (paths, commands, thresholds, edge cases) go into a collapsed `<details>`. Collapsed content is still part of the plan: the user can open and comment on it, and it binds the implementer.
 
 **Sections**
 
 In this order; drop a section only when it would be empty:
 
-| Section | Glance layer | Typical detail layer |
+| Section | Contents | Ids |
 | --- | --- | --- |
-| `header` | `h1`; `p id="summary"`, one or two sentences, at most 40 words; `ul class="facts"`, 3–5 chips; one `aside class="ask" id="question-N"` per open question that blocks approval | — |
-| `goal`, heading "Done when" | `ul class="checks"`, 2–5 items `check-N` the user can verify | `details` "How to verify": steps and commands |
-| `scope` | `div class="compare"`: an `ok` column "In", a `no` column "Out" | — |
-| `approach` | `ol class="flow"` with 3–6 boxes showing how it works; alternatives as a table with a `chosen` row, or `compare` columns with a `chosen` column; at most two short `p` | `details` "Files (N)" holding a `ul class="files"` changeset; an interface in `pre` when the interface is the decision |
-| `steps` | `ol class="steps"`, items `step-N`: `<strong>Title</strong>` plus a caption of at most 8 words | a `details` inside each step that needs specifics (no `summary`; the panel labels it "Details") |
-| `risks` | `li` with `warn` or `risk`, ids `risk-N`, written as "risk → mitigation"; open questions that block only a later step as `li class="ask" id="question-N"`, naming the step | a `details` inside a risk whose mitigation needs a command or setting |
-| `decisions` | `dl`: `dt id="decision-N"` short label, `dd` the answer | a `details` inside a `dd` for long specifics (version pins, URL lists) |
+| `header` | `h1`; `p id="summary"`: what and why, at most 40 words; `ul class="facts"`, 2–4 chips; one `aside class="ask"` per open question that blocks approval | `question-N` |
+| `task`, heading "Task" | `ul` of outcomes: what will be true, in terms the user can see, not code changes. Then a `dl` of decisions, including "Out of scope". Then `details` "Context": the files, patterns, and docs the implementer should read first | `task-N`, `decision-N` on the `dt` |
+| `guardrails`, heading "Guardrails" | `div class="compare"` with three columns: `ok` "Always", `ask` "Ask first", `no` "Never". Drop an empty column | `guard-N`, numbered across columns |
+| `done`, heading "Done when" | `ul class="checks"`: each criterion is an observable result, with a `details` inside saying how to verify it when that is not obvious. The last criterion is usually the repo's own checks passing | `done-N` |
 
-Section rules:
+The implementing agent adds a `log` section ("Progress") below; never write one into a plan yourself.
 
-- **Facts** are facts or your own assessment, never invented: Size (from Step 1), Files (count of the changeset), Risk (from the highest tone in Risks: none is low, `warn` is medium, `risk` is high, with the matching class on the chip), New (parts that do not exist yet). One to three words per chip.
-- **Questions** are only open ones. A question the interview answered becomes a decision and disappears.
-- **Decisions** stay visible, because the user made them, but compact: at most about 12 rows. Group related decisions under one label (for example "Tooling") with the specifics in a `details` inside the `dd`. An option marked `chosen` in the approach is the record of that decision; do not repeat it as a `dt`. Mark assumptions with `<span class="tag">assumed</span>` placed right after the assumed part.
-- **Phases.** For L plans, group steps under one `h3` per phase, each followed by its own `ol class="steps"` with `start` continuing the numbering. The step budget counts all phases together:
+**What makes each section good**
 
-```html
-<h3>Foundation</h3>
-<ol class="steps">
-<li id="step-1"><strong>Scaffold</strong> app, lint, hooks</li>
-</ol>
-<h3>Pages</h3>
-<ol class="steps" start="2">
-<li id="step-2"><strong>Landing page</strong> every module type</li>
-</ol>
-```
+- **Task** describes outcomes, not work. "Bell shows an unread count", not "Add a Bell component". Decisions record what the interview settled, so the implementer does not reopen them; a decision with real alternatives says which was chosen and, in a few words, what was rejected. "Context" lists only what is not obvious from the repo, such as the existing pattern to copy, the event to hook into, or the doc that explains a constraint.
+- **Guardrails** are specific to this task and concrete enough to check: name the path, the command, the dependency. "Never edit `src/legacy/`", not "be careful with legacy code". Do not restate rules that already live in `CLAUDE.md` or `AGENTS.md`. Always: invariants the implementer must hold throughout. Ask first: actions that need the user's go-ahead mid-run (new dependencies, schema or public API changes, deleting files, anything irreversible). Never: the shortcuts a stuck agent is tempted by (editing or skipping tests to make them pass, widening scope, touching out-of-scope areas). If a Never matters every single time, also suggest a hook or deny rule in your hand-over message, since a plan is guidance and a hook is enforced.
+- **Done when** is the stop condition. Every criterion must be verifiable by running something or looking at something, and must pass or fail without judgment: "Bell count updates within 5 s", not "notifications work well". Prefer end-to-end checks a user would do over unit tests alone. Put the exact command and expected result in the criterion's `details`. 2–6 criteria; if you need more, the plan is too big.
+
+**Facts** are facts or your own assessment, never invented: Size (from Step 1), Area (the parts of the system touched), New (parts that do not exist yet), Risk (low, medium with `warn`, high with `risk`). One to three words per chip.
+
+**Questions** are only open ones. A question the interview answered becomes a decision and disappears.
 
 **Budgets**
 
-| Size | Steps | Visible items | Whole file |
+| Size | Task items | Criteria | Whole file |
 | --- | --- | --- | --- |
-| XS/S | ≤ 5 | ≤ 25 | ≤ 4,000 bytes |
-| M | ≤ 8 | ≤ 40 | ≤ 7,000 bytes |
-| L | ≤ 12 | ≤ 60 | ≤ 12,000 bytes |
+| XS/S | ≤ 3 | ≤ 3 | ≤ 3,000 bytes |
+| M | ≤ 5 | ≤ 5 | ≤ 5,000 bytes |
+| L | ≤ 7 | ≤ 6 | ≤ 8,000 bytes |
 
-Visible items are every `li`, `p`, `tr` (header rows included), and `dt` outside a `details`; chips and flow boxes count. Measure the file with `wc -c`.
-
-The two budgets fail for different reasons and have different fixes:
-
-- **Too many visible items:** the glance layer carries detail. Move specifics into `details`, group decisions, merge steps.
-- **Too many bytes:** the detail layer is wordy. Cut rationale and evidence (why something was chosen, how you checked it), repeated paths, optional ids, and filler; write fragments. Moving text into `details` does not save bytes.
-
-Never drop a specific the implementer needs to meet a budget. If the file is still slightly over after cutting, that is acceptable. If it is far over (about 25 % or more), the request is too big for one plan: tell the user and propose splitting it into separate plans.
+Measure the file with `wc -c`. Never drop a specific the implementer needs to meet a budget. If the plan is far over (about 25 % or more), the request is too big for one plan: tell the user and propose splitting it into separate plans that can be implemented one after another.
 
 **Writing rules**
 
-- Say each thing once. The summary, "Done when", flow, and steps each have their own job. Decisions are not restated in the approach.
-- The `files` changeset is the only full list of paths. A step's details may name a path where a specific needs it ("`markRead` in `src/notifications/service.ts`"), but steps do not get their own file lists.
-- Prefer a component over a paragraph: a sequence is a `flow` or `steps`, a comparison is `compare` or a table, attributes are `facts` or a `dl`, a status is a tone class or a tag.
-- Statements in lists (checks, scope items, risks) are fragments of about 4–12 words; titles, chips, and captions are shorter. No filler ("This step will…", "We need to…").
-- In the glance layer, use `code` only for names the user must recognize, such as the one command they run to verify. Other paths, signatures, and commands belong in `details`.
-- Tables: at most 3 columns, cells of a few words. The panel is narrow.
-- The detail layer is terse too: fragments, no prose, no pasted code beyond a short interface.
+- Say each thing once. The summary says what and why; Task says what will be true; Done when says how to tell. A decision is not repeated as a guardrail.
+- Statements in lists are fragments of about 4–12 words; titles, chips, and `dt` labels are shorter. No filler ("This will…", "We need to…").
+- In visible text, use `code` only for names the user must recognize, such as the command they run to verify or a path a guardrail forbids. Other paths and commands belong in `details`.
+- The detail layer is terse too: fragments, no prose, no pasted code beyond a short interface when the interface is itself a decision.
 - No indentation. One block per line; short pairs such as `<dt>…</dt><dd>…</dd>` may share a line.
 
 **Metadata**
 
 - `<title>Plan: …</title>`
 - `<meta name="plan-revision" content="1">`, bump on every revision
-- `<meta name="plan-status" content="review">`; `draft` while writing, `review` when handed over, `approved` after the user approves (pressing **Break down** counts)
+- `<meta name="plan-status" content="review">`: `draft` while writing, `review` when handed over, `approved` once the user approves, `done` when the implementer has verified every criterion
 
 **Ids**
 
-Give an id to every section, step, check, scope item, decision, risk, question, and option row. Other elements (chips, flow boxes, items inside `details`) need none; comments on them are matched by position. Ids are how the panel attaches comments and how feedback refers back to the plan.
+Give an id to every section, task item, decision, guardrail, criterion, and question. Other elements need none; comments on them are matched by position. Ids are how the panel attaches comments and how feedback refers back to the plan.
 
 - A new plan numbers ids from 1 in document order.
-- A revision never renumbers. New elements get new ids (`step-3b`, `step-13`). When two elements merge, the survivor keeps its id and the other is deleted; update any cross-reference such as `#step-14` that pointed at it.
-- The panel numbers steps by position, so gaps in id numbers are invisible to the user.
+- A revision never renumbers. New elements get new ids (`task-2b`, `done-5`). When two elements merge, the survivor keeps its id and the other is deleted.
 
 ## Step 4: Hand the plan to the user
 
 After writing the file, send one short message:
 
 - Where the plan is and how to open it: the **Plan** tab in the workspace, **Plans** in the sidebar, the Command Center item **Open plan panel**, or `/plan-panel` in the composer.
-- The two or three decisions most worth a second look.
-- That you will wait for comments from the panel or an approval.
+- The two or three decisions or guardrails most worth a second look.
+- Any guardrail worth enforcing with a hook or permission rule.
+- That you will wait for comments from the panel, or for **Implement**.
 
 Then stop. Do not start implementing. Do not paste the plan into the chat; the panel is the review surface. If the user says they cannot see the panel, tell them the `plan-panel` plugin needs to be installed and running in Paseo (Settings → Plugins).
 
@@ -170,9 +144,9 @@ Then stop. Do not start implementing. Do not paste the plan into the chat; the p
 
 Feedback arrives as a message that starts with `[plan-panel feedback]` and lists numbered comments. Each comment carries:
 
-- **Where:** a heading breadcrumb, the element kind, and the element id (`#step-3`) or the anchor it sits inside (`inside #scope`). A highlighted range that spans blocks reads `from … to …`.
+- **Where:** a heading breadcrumb, the element kind, and the element id (`#guard-3`) or the anchor it sits inside (`inside #task`). A highlighted range that spans blocks reads `from … to …`.
 - **Quote:** the text of the element the user selected, or
-- **Selected:** the exact passage the user highlighted with the mouse. Treat a selected passage as the precise target: change that wording or that part of the step, not the whole element, unless the comment says otherwise.
+- **Selected:** the exact passage the user highlighted with the mouse. Treat a selected passage as the precise target: change that wording, not the whole element, unless the comment says otherwise.
 - **Comment:** the user's note.
 
 The user can select several elements for one comment. Then **Where** reads `N blocks` and is followed by one `- <location>: "<quote>"` line per element. The comment applies to all of them together, for example "merge these" or "same problem in each". A `facts` row, a `flow`, and an `aside` are selected as a whole and are reported as `fact chips`, `flow`, and `callout`.
@@ -182,40 +156,20 @@ A comment with **Where: whole plan** is about the plan overall.
 Procedure:
 
 1. Read the current plan file; the panel may be ahead of your memory of it.
-2. For each comment, locate the element by id first, then by breadcrumb and quote. Decide what changes: the element itself, its section, or the whole approach.
+2. For each comment, locate the element by id first, then by breadcrumb and quote. Decide what changes: the element itself, its section, or the whole plan.
 3. If a comment is ambiguous or conflicts with an earlier decision, ask about that comment specifically before changing the plan. Apply the unambiguous ones in the same turn.
-4. Rewrite the file in place: keep ids stable, bump `plan-revision`, add `data-revised="<new revision>"` to every element you changed or added, remove or rewrite anything the feedback invalidated, and update **Decisions** with what the feedback decided.
-5. Reply with a numbered list mirroring the comment numbers: one line per comment saying what changed and where (`#step-3`). Mention anything you chose not to change and why.
+4. Rewrite the file in place: keep ids stable, bump `plan-revision`, add `data-revised="<new revision>"` to every element you changed or added, remove or rewrite anything the feedback invalidated, and record what the feedback decided as a decision.
+5. Reply with a numbered list mirroring the comment numbers: one line per comment saying what changed and where (`#done-2`). Mention anything you chose not to change and why.
 
-**Approval.** The user approves by pressing **Break down** in the panel, which sends `[plan-panel breakdown]` (step 7), or by saying so in chat or in panel feedback. Set `plan-status` to `approved` (no revision bump needed). After a Break down, continue with step 7; otherwise move to step 6.
+## Step 6: Implement
 
-## Step 6: Hand off
+The user approves by pressing **Implement** in the panel, which sends `[plan-panel implement]` naming the plan file, or by saying so in chat. Unsent comments are not part of the approval; if the message mentions any, ask whether to address them first.
 
-Ask how the user wants to proceed if it is not already clear: implement it yourself now, hand off to another agent, or break it down into a roadmap for an orchestrated run (the panel's **Break down** button, or step 7 directly). Suggest the roadmap for M and L plans, where one agent would run out of context. For a handoff, use the `paseo-handoff` skill if available and point the receiving agent at the plan file; the plan is the briefing. Read the whole file before starting, including every `details` block: the detail layer is where the specifics live.
+Set `plan-status` to `approved` (no revision bump), then follow the `paseo-implement` skill: it covers working against the criteria, subagents, the progress log, and the final report. If the skill is not available, implement with these rules: read the whole plan including every `details`; respect every guardrail and stop to ask on "Ask first"; tick a criterion with `class="done"` only after running its check; report each criterion with the evidence that it passes.
 
-While implementing, keep the plan honest so the panel shows progress:
-
-- Mark the step you are on with `class="doing"` and finished steps with `class="done"`; tick met criteria in "Done when" with `class="done"`. These edits do not need a revision bump.
-- When reality forces a change to a step, update the plan file, bump the revision, and mark the change with `data-revised` so the panel stays the source of truth.
-
-## Step 7: Break down into a roadmap
-
-A roadmap is a markdown file that splits the plan into small work packages. The user reviews it in the panel like a plan, then presses **Run**: a new orchestrator agent (the `paseo-orchestrate` skill) takes the packages one at a time, with a scout agent that explores the code and writes a focused brief, then a builder agent that implements the brief. Your job is the cut, not the code-level specifics.
-
-The request arrives as a message starting with `[plan-panel breakdown]` that names the plan file and the roadmap file, or the user asks for it in chat. The Break down button is the user's approval of the plan.
-
-1. Set the plan's `plan-status` to `approved`.
-2. Read `references/roadmap.md` and `references/roadmap-template.md`.
-3. Read the plan file, including every `details` block.
-4. Skim the code along the plan's changeset for seams and the check commands. Stop there; scouts do the deep reading.
-5. Write `.paseo/plans/<plan-slug>.roadmap.md`. If it exists, revise it in place and keep package ids and `Status:` lines.
-6. Reply in a few lines: the number of packages, the order in one line, anything uncovered or risky, and that the user can open it with the **Roadmap** button on the plan, comment on it, and press **Run** when it looks right. Then stop. Do not start implementing and do not start the orchestrator yourself.
-
-Feedback on the roadmap arrives as `[plan-panel feedback]` naming the roadmap file. Revise it with step 5 and the revising rules in `references/roadmap.md`.
+For a handoff to another agent instead, use the `paseo-handoff` skill if available and point the receiving agent at the plan file and the `paseo-implement` skill; the plan is the briefing.
 
 ## Reference files
 
-- `references/plan-template.html`: a complete M-sized plan using every component. Copy its structure and its terseness.
+- `references/plan-template.html`: a complete M-sized plan. Copy its structure and its terseness.
 - `references/html-subset.md`: the exact elements and classes the panel renders, the id rules, and the revision markers.
-- `references/roadmap.md`: the markdown roadmap format, how to cut a plan into work packages, and the status values the orchestrator writes.
-- `references/roadmap-template.md`: a complete roadmap for the plan template.
